@@ -1,12 +1,13 @@
 App = {
   loading: false,
   contracts: {},
-  
+
   load: async () => {
     await App.loadWeb3();
     await App.loadAccount();
     await App.loadContract();
     await App.render();
+    App.bindEvents();
   },
 
   loadWeb3: async () => {
@@ -39,7 +40,7 @@ App = {
   },
 
   loadContract: async () => {
-    const votingSystem = await $.getJSON('/build/contracts/Voting.json');// Load ABI
+    const votingSystem = await $.getJSON('/build/contracts/Voting.json');
     App.contracts.Voting = TruffleContract(votingSystem);
     App.contracts.Voting.setProvider(App.web3Provider);
     App.votingSystem = await App.contracts.Voting.deployed();
@@ -51,91 +52,98 @@ App = {
 
     $('#account').html(App.account);
 
-    await App.renderPolls(); // Load the poll options
+    await App.renderPolls();
 
     App.setLoading(false);
   },
 
   renderPolls: async () => {
-    const pollCount = await App.votingSystem.pollsCount(); // Get total number of polls
+    const pollCount = await App.votingSystem.pollsCount();
     const $pollTemplate = $('.pollTemplate');
-  
+
     for (let i = 0; i < pollCount; i++) {
       const poll = await App.votingSystem.polls(i);
       const question = poll.question;
-  
-      // Fetch the poll options using the new getter
-      const options = await App.votingSystem.getPollOptions(i); // Call the new getter
-  
+      const options = await App.votingSystem.getPollOptions(i);
+
       const $newPollTemplate = $pollTemplate.clone();
       $newPollTemplate.find('.question').html(question);
-  
-      // Add options to the poll template
+
       options.forEach((option, index) => {
+        // Inside the loop of render polls:
         $newPollTemplate.find('.options').append(`
           <label>
-            <input type="radio" name="poll_${i}" value="${index}" data-pollIndex="${i}" /> ${option}
+            <input 
+              type="radio" 
+              name="poll_${i}" 
+              value="${index}" 
+              data-pollindex="${i}" 
+            />
+            ${option}
           </label><br>
         `);
       });
-  
+
       $('#pollsList').append($newPollTemplate);
       $newPollTemplate.show();
     }
   },
-  
-  
 
-  // Handle the "Create Poll" button click
   createPoll: async () => {
     const question = $('#question').val();
     const optionsInput = $('#options').val();
-    const options = optionsInput.split(',').map(option => option.trim()); // Convert comma-separated options to an array
+    const options = optionsInput.split(',').map(option => option.trim());
 
     if (!question || options.length === 0) {
       alert("Please enter a question and at least one option.");
       return;
     }
 
-    // Call the createPoll function in the contract
     await App.votingSystem.createPoll(question, options, { from: App.account });
     alert("Poll created successfully!");
-
-    // Reload the polls list
     await App.renderPolls();
   },
 
   vote: async () => {
-    const selectedPollIndex = $('input[name="poll"]:checked').data('pollIndex');
-    const selectedOptionIndex = $('input[name="poll_' + selectedPollIndex + '"]:checked').val();
+    // Get the selected radio button
+    const selectedOption = $('input[name^="poll_"]:checked');
 
-    // Ensure QR code is uploaded
-    const qrCode = $('#qrUpload')[0].files[0];
-
-    // Debug logs to check if values are being properly retrieved
-  console.log("Selected Poll Index:", selectedPollIndex);
-  console.log("Selected Option Index:", selectedOptionIndex);
-  console.log("Uploaded QR Code File:", qrCode);
-
-
-    if (!selectedOptionIndex || !qrCode) {
-      alert("Please select an option and upload a QR code.");
+    // Check if any option is selected
+    if (!selectedOption.length) {
+      alert("Please select an option.");
       return;
     }
 
-    // Decode QR code
-    const qrData = await App.decodeQRCodeFromFile(qrCode);  // Decode QR code
-    console.log("data is:",qrData);//for debug
+    // Extract poll index and option index
+    const selectedPollIndex = selectedOption.data('pollindex'); // Lowercase "pollindex"
+    const selectedOptionIndex = selectedOption.val();
 
-    if (qrData) {
+    console.log("Selected Poll Index:", selectedPollIndex);
+    console.log("Selected Option Index:", selectedOptionIndex);
+
+    // QR code validation
+    const qrCode = $('#qrUpload')[0].files[0];
+    if (!qrCode) {
+      alert("Please upload a QR code.");
+      return;
+    }
+
+    try {
+      // Decode QR code
+      const qrData = await App.decodeQRCodeFromFile(qrCode);
       console.log("Decoded QR Data:", qrData);
-      await App.votingSystem.vote(selectedPollIndex, selectedOptionIndex, qrData, { from: App.account });
-      alert("Vote successfully submitted!");
 
-      // Show the voters list after voting
-      await App.showVotersList();
-    } else {
-      alert("Invalid QR code.");
+      // Submit vote
+      if (qrData && App.isValidVoter(qrData)) {
+        await App.votingSystem.vote(selectedPollIndex, selectedOptionIndex, qrData, { from: App.account });
+        alert("Vote submitted successfully!");
+        await App.showVotersList();
+      } else {
+        alert("Invalid voter ID or already voted.");
+      }
+    } catch (error) {
+      console.error("Error:", error);
+      alert("Failed to submit vote. Check the console for details.");
     }
   },
 
@@ -150,31 +158,88 @@ App = {
           canvas.width = img.width;
           canvas.height = img.height;
           context.drawImage(img, 0, 0);
-
           const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
           const qrCode = jsQR(imageData.data, canvas.width, canvas.height);
-          if (qrCode) {
-            resolve(qrCode.data); // Return QR code data
-          } else {
-            reject("QR code not found");
-          }
+          qrCode ? resolve(qrCode.data) : reject("QR code not found in the image.");
         };
         img.src = e.target.result;
       };
+      reader.onerror = () => reject("Error reading file.");
       reader.readAsDataURL(file);
     });
   },
 
+  handleQRUpload: (event) => {
+    const qrFile = event.target.files[0];
+    if (!qrFile) {
+      alert("Please upload a file.");
+      return;
+    }
+
+    App.decodeQRCodeFromFile(qrFile).then((qrData) => {
+      console.log("QR Code Data:", qrData);
+      // Add your additional logic here to handle QR data
+    }).catch((error) => {
+      console.error("Error decoding QR code:", error);
+    });
+  },
+
+  isValidVoter: (voterID) => {
+    // Implement voter validation logic here
+    const allowedVoters = ["12345", "67890", "ABCDE","vote123"]; // Example valid voter IDs
+    return allowedVoters.includes(voterID);
+  },
+
   showVotersList: async () => {
-    const votersList = await App.votingSystem.getVoters(); // Assuming this method returns voters list
+    const votersList = await App.votingSystem.getVoters();
     const $votersList = $('#votersList');
     $votersList.empty();
-
     votersList.forEach(voter => {
       $votersList.append(`<li>${voter}</li>`);
     });
-
     $('#votersListSection').show();
+  },
+
+  bindEvents: () => {
+    $('#showResultsBtn').click(App.displayResults);
+  },
+
+  // Display results
+  displayResults: async () => {
+    
+    try {
+      // Get the total number of polls
+      const pollsCount = await App.votingSystem.pollsCount();
+      
+      let resultsHTML = '';
+
+      // Loop through all polls
+      for (let i = 0; i < pollsCount; i++) {
+        // Get poll question
+        const poll = await App.votingSystem.polls(i);
+        const question = poll.question;
+        
+        // Get poll options and votes
+        const options = await App.votingSystem.getPollOptions(i);
+        const votes = await App.votingSystem.getPollVotes(i);
+        
+        // Create HTML for each poll
+        resultsHTML += `
+          <div class="poll-result">
+            <h3>${question}</h3>
+            <ul>
+              ${options.map((option, index) => `<li>${option}: ${votes[index]} votes</li>`).join('')}
+            </ul>
+          </div>
+        `;
+      }
+
+      // Inject the results into the HTML
+      $('#resultsSection').html(resultsHTML);
+    } catch (error) {
+      console.error("Error loading results: ", error);
+      $('#resultsSection').html('<p>Error loading results.</p>');
+    }
   },
 
   setLoading: (boolean) => {
@@ -193,9 +258,11 @@ App = {
 
 $(async () => {
   await App.load();
-
-  // Bind the createPoll button
+  $('#qrUpload').change(App.handleQRUpload);  // Attach the handleQRUpload to file input change event
   $('#createPollBtn').click(async () => {
     await App.createPoll();
+  });
+  $('#showResultsBtn').click(async () => {
+    await App.displayResults();  
   });
 });

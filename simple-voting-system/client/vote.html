@@ -37,7 +37,7 @@
         <!-- QR Code Upload -->
         <div>
           <label for="qrUpload">Upload your QR code to confirm your identity:</label>
-          <input type="file" id="qrUpload" accept="image/*" />
+          <input type="file" id="qrUpload" accept="image/*" onchange="App.handleQRUpload(event)">
         </div>
 
         <!-- Submit Vote -->

@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 contract Voting {
     address public admin;
+    address[] public voters;
 
     // Mapping to track whether an address has voted
     mapping(address => bool) public hasVoted;
@@ -64,7 +65,8 @@ contract Voting {
 
         // Mark the QR code as used
         poll.usedQrCodes[qrCode] = true;
-
+        // Inside the vote function
+        voters.push(msg.sender);
         // Emit the vote event with QR code
         emit Voted(msg.sender, pollIndex, optionIndex, qrCode);
     }
@@ -79,4 +81,22 @@ contract Voting {
         }
         return results;
     }
+
+    function getVoters() public view returns (address[] memory) {
+    return voters;
+    }
+
+
+    //for specific polls
+    function getPollVotes(uint256 _pollIndex) public view returns (uint256[] memory) {
+        Poll storage poll = polls[_pollIndex];
+        uint256[] memory votes = new uint256[](poll.options.length);
+
+        for (uint256 i = 0; i < poll.options.length; i++) {
+            votes[i] = poll.votes[i];
+        }
+
+        return votes;
+    }
+
 }
