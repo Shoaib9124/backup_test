@@ -110,12 +110,12 @@ App = {
 
     // Check if any option is selected
     if (!selectedOption.length) {
-      alert("Please select an option.");
-      return;
+        alert("Please select an option.");
+        return;
     }
 
     // Extract poll index and option index
-    const selectedPollIndex = selectedOption.data('pollindex'); // Lowercase "pollindex"
+    const selectedPollIndex = selectedOption.data('pollindex'); 
     const selectedOptionIndex = selectedOption.val();
 
     console.log("Selected Poll Index:", selectedPollIndex);
@@ -124,50 +124,74 @@ App = {
     // QR code validation
     const qrCode = $('#qrUpload')[0].files[0];
     if (!qrCode) {
-      alert("Please upload a QR code.");
-      return;
+        alert("Please upload a QR code.");
+        return;
     }
 
     try {
-      // Decode QR code
-      const qrData = await App.decodeQRCodeFromFile(qrCode);
-      console.log("Decoded QR Data:", qrData);
+        // Decode QR code
+        const qrData = await App.decodeQRCodeFromFile(qrCode);
+        console.log("Decoded QR Data:", qrData);
 
-      // Submit vote
-      if (qrData && App.isValidVoter(qrData)) {
-        await App.votingSystem.vote(selectedPollIndex, selectedOptionIndex, qrData, { from: App.account });
-        alert("Vote submitted successfully!");
-        await App.showVotersList();
-      } else {
-        alert("Invalid voter ID or already voted.");
-      }
+        // Check if the user has already voted using the contract's mapping
+        const hasVoted = await App.votingSystem.hasVoted(App.account);
+        if (hasVoted) {
+            alert("You have already voted. Please switch accounts to vote again.");
+            return;
+        }
+
+        // Validate voter and submit vote
+        if (qrData && App.isValidVoter(qrData)) {
+            await App.votingSystem.vote(selectedPollIndex, selectedOptionIndex, qrData, { 
+                from: App.account,
+                gas: 300000 // Explicit gas limit to prevent estimation issues
+            });
+
+            alert("Vote submitted successfully!");
+            await App.showVotersList();
+        } else {
+            alert("Invalid voter ID or already voted.");
+        }
     } catch (error) {
-      console.error("Error:", error);
-      alert("Failed to submit vote. Check the console for details.");
-    }
-  },
+        console.error("Full error:", error);
+        
+        // Extract meaningful error messages
+        const revertMsg = error.data?.message || 
+                          error.message.match(/revert (.*)/)?.[1] || 
+                          "Unknown error";
 
-  decodeQRCodeFromFile: async (file) => {
+        if (revertMsg.includes("You have already voted")) {
+            alert("You have already voted. Switch MetaMask accounts to vote again.");
+        } else if (revertMsg.includes("QR code has already been used")) {
+            alert("This QR code has already been used.");
+        } else {
+            alert(`Vote failed: ${revertMsg}`);
+        }
+    }
+},
+
+decodeQRCodeFromFile: async (file) => {
     return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const context = canvas.getContext('2d');
-          canvas.width = img.width;
-          canvas.height = img.height;
-          context.drawImage(img, 0, 0);
-          const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-          const qrCode = jsQR(imageData.data, canvas.width, canvas.height);
-          qrCode ? resolve(qrCode.data) : reject("QR code not found in the image.");
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                context.drawImage(img, 0, 0);
+                const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                const qrCode = jsQR(imageData.data, canvas.width, canvas.height);
+                qrCode ? resolve(qrCode.data) : reject("QR code not found in the image.");
+            };
+            img.src = e.target.result;
         };
-        img.src = e.target.result;
-      };
-      reader.onerror = () => reject("Error reading file.");
-      reader.readAsDataURL(file);
+        reader.onerror = () => reject("Error reading file.");
+        reader.readAsDataURL(file);
     });
-  },
+}
+,
 
   handleQRUpload: (event) => {
     const qrFile = event.target.files[0];
@@ -186,7 +210,7 @@ App = {
 
   isValidVoter: (voterID) => {
     // Implement voter validation logic here
-    const allowedVoters = ["12345", "67890", "ABCDE","vote123"]; // Example valid voter IDs
+    const allowedVoters = ["12345", "67890", "ABCDE","vote123","vote124"]; // Example valid voter IDs
     return allowedVoters.includes(voterID);
   },
 

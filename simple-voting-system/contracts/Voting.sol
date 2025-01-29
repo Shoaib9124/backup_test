@@ -65,8 +65,10 @@ contract Voting {
 
         // Mark the QR code as used
         poll.usedQrCodes[qrCode] = true;
+
         // Inside the vote function
         voters.push(msg.sender);
+
         // Emit the vote event with QR code
         emit Voted(msg.sender, pollIndex, optionIndex, qrCode);
     }
@@ -83,11 +85,10 @@ contract Voting {
     }
 
     function getVoters() public view returns (address[] memory) {
-    return voters;
+        return voters;
     }
 
-
-    //for specific polls
+    // For specific polls
     function getPollVotes(uint256 _pollIndex) public view returns (uint256[] memory) {
         Poll storage poll = polls[_pollIndex];
         uint256[] memory votes = new uint256[](poll.options.length);
@@ -98,5 +99,4 @@ contract Voting {
 
         return votes;
     }
-
 }
