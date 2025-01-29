@@ -29,28 +29,38 @@ body {
   text-align: center;
   width: 350px;
   animation: fadeIn 1s ease-in-out;
+  transform: scale(0.95);
+  transition: transform 0.4s ease-in-out;
+}
+
+.container:hover {
+  transform: scale(1);
 }
 
 /* Heading */
 h1 {
-  font-size: 24px;
+  font-size: 28px;
   font-weight: 600;
   color: #fff;
-  margin-bottom: 20px;
+  margin-bottom: 30px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  animation: fadeInText 2s ease-out;
 }
 
 /* Button Container */
 .button-container {
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  gap: 20px;
+  animation: fadeInText 2s ease-out 0.2s;
 }
 
 /* Buttons */
 button {
   background: rgba(255, 255, 255, 0.2);
   border: none;
-  padding: 12px 20px;
+  padding: 14px 22px;
   font-size: 16px;
   color: white;
   border-radius: 5px;
@@ -60,6 +70,7 @@ button {
   position: relative;
   overflow: hidden;
   z-index: 1;
+  box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.3);
 }
 
 button::before {
@@ -79,8 +90,14 @@ button:hover::before {
 }
 
 button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0px 5px 10px rgba(255, 255, 255, 0.2);
+  transform: translateY(-3px);
+  box-shadow: 0px 6px 15px rgba(0, 0, 0, 0.4);
+  transition: 0.2s ease-in-out;
+}
+
+button:active {
+  transform: translateY(0);
+  box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.2);
 }
 
 /* Button Colors */
@@ -99,7 +116,39 @@ button:hover {
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes fadeInText {
+  0% { opacity: 0; transform: translateY(-20px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
 @keyframes gradientMove {
   0% { background-position: left; }
   100% { background-position: right; }
+}
+
+/* Smooth Gradient Transitions */
+@keyframes gradientGlow {
+  0% { background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d); }
+  50% { background: linear-gradient(135deg, #ff7300, #fdbb2d, #1a2a6c); }
+  100% { background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d); }
+}
+
+body {
+  animation: gradientGlow 12s ease-in-out infinite;
+}
+
+/* Hover effects for buttons */
+button {
+  transition: 0.3s ease;
+}
+
+button:hover {
+  transform: scale(1.05);
+  background: rgba(255, 255, 255, 0.3);
+  box-shadow: 0px 8px 15px rgba(0, 0, 0, 0.4);
+}
+
+/* Animation for buttons when hovered */
+button:hover::before {
+  left: 0;
 }
